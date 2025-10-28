@@ -9,6 +9,9 @@
 // Forward-declare control functions
 void MEASURE_COLLECTION_SENSOR_CONTROL();
 
+String statusCmd = "";
+String controlCmd = "";
+
 WaterDataStruct waterDataPayload[12];
 
 // Using the 16-bit UUIDs you already used (they map to full 128-bit UUIDs automatically)
@@ -19,7 +22,7 @@ BLECharacteristic waterConfigChar = BLECharacteristic(0x183A);
 BLECharacteristic waterStatusChar = BLECharacteristic(0x184A);
 
 // Keep simple state machine
-enum DeviceState { IDLE, INIT_RECEIVED, READY, MOVING };
+enum DeviceState { IDLE, INIT_RECEIVED, READY, COLLECTING_DATA, READY_TO_TX, TX_MORE, TX_LAST};
 DeviceState devState = IDLE;
 
 void logSerial(const char* tag, const String &msg) {
@@ -46,32 +49,57 @@ void setBLECharacteristicDefaults() {
 
 void onControlWritten(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len) {
   // data is raw bytes — interpret as C-string
-  String cmd = String((char*)data).substring(0, len);
-  String logmsg = "Control WRITE received: " + cmd;
+  controlCmd = String((char*)data).substring(0, len);
+  String logmsg = "Control WRITE received: " + controlCmd;
   logSerial("BLE", logmsg);
 
-  if (cmd == "Init") {
+  if (controlCmd == "Init") {
     devState = INIT_RECEIVED;
     // Notify status "Ready"
-    String statusCmd = "Ready";
+    statusCmd = "Ready";
     // Update status characteristic value and notify
     waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
     waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
     devState = READY;
     logSerial("BLE", "Sent status 'Ready' (notify)");
   }
-  else if (cmd == "Moving") {
-    devState = MOVING;
+  else if (controlCmd == "Moving" && statusCmd == "Ready") {
+    devState = COLLECTING_DATA;
     // Update and notify status as well
-    String statusCmd = "Moving";
+    statusCmd = "Moving";
     waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
     waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
+    devState = COLLECTING_DATA;
+    MEASURE_COLLECTION_SENSOR_CONTROL();
     logSerial("BLE", "Control 'Moving' received — status set & notified to 'Moving'");
+
+    statusCmd = "Ready_to_TX";
+    waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
+    waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
+    devState = READY_TO_TX;
     // At this point the Pi is still connected; the Pi intends to disconnect (simulate going underwater)
+
   }
-  // else if (cmd == "")
+  else if (controlCmd == "Moving" && devState == READY_TO_TX) {
+    // Notify status "Listen"
+    statusCmd = "Listen";
+    // Update status characteristic value and notify
+    waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
+    waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
+    devState = READY_TO_TX;
+    logSerial("BLE", "Sent status 'Listen' (notify)");
+  }
+    else if (controlCmd == "Listen" && devState == READY_TO_TX) {
+    // Notify status "TX"
+    statusCmd = "TX";
+    // Update status characteristic value and notify
+    waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
+    waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
+    devState = TX_LAST;
+    logSerial("BLE", "Sent status 'Listen' (notify)");
+  }
   else {
-    logSerial("BLE", ("Unknown control: " + cmd));
+    logSerial("BLE", ("Unknown control: " + controlCmd));
   }
 }
 
@@ -84,28 +112,26 @@ void onStatusWritten(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, u
 void conn_cb(uint16_t conn_hdl) {
   (void) conn_hdl;
   logSerial("BLE", "Central connected");
+  if (devState == COLLECTING_DATA) {
+      devState = READY_TO_TX;
+      logSerial("BLE", "Device state set to READY_TO_TX on connection");
+    
+  }
 }
 
 void disconn_cb(uint16_t conn_hdl, uint8_t reason) {
   (void) conn_hdl;
   (void) reason;
   logSerial("BLE", "Central disconnected - calling MEASURE_COLLECTION_SENSOR_CONTROL()");
-  // Start sensor collection because RPi is underwater / gone
-  MEASURE_COLLECTION_SENSOR_CONTROL();
+  
 }
 
 // Example function called when Pi disconnects (you will implement actual sensors)
 void MEASURE_COLLECTION_SENSOR_CONTROL() {
   logSerial("SENSOR", "MEASURE_COLLECTION_SENSOR_CONTROL() started");
-  // Example: toggle onboard LED to show activity (if available)
-  for (int i=0;i<3;i++) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(250);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(250);
-  }
   // Log end
   logSerial("SENSOR", "MEASURE_COLLECTION_SENSOR_CONTROL() completed");
+  delay(10000);
   fillPayloadWithDummyData(waterDataPayload);
   logSerial("SENSOR", "Dummy data filled into payload");
   
