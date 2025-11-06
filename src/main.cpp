@@ -89,14 +89,44 @@ void onControlWritten(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, 
     devState = READY_TO_TX;
     logSerial("BLE", "Sent status 'Listen' (notify)");
   }
-    else if (controlCmd == "Listen" && devState == READY_TO_TX) {
-    // Notify status "TX"
-    statusCmd = "TX";
-    // Update status characteristic value and notify
+else if (controlCmd == "Listen" && devState == READY_TO_TX) {
+  // Notify status "TX"
+  statusCmd = "TX";
+  waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
+  waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
+  devState = TX_LAST;
+  logSerial("BLE", "Sent status 'TX' (notify)");
+
+  // --- Send payload data over BLE ---
+  logSerial("BLE", "Sending data payload...");
+  for (int i = 0; i < 12; i++) {
+    waterDataChar.notify((uint8_t*)&waterDataPayload[i], sizeof(WaterDataStruct));
+    delay(100); // small delay between chunks
+  }
+  logSerial("BLE", "All data chunks sent.");
+
+  // Optional: signal transmission complete
+  statusCmd = "TX_done";
+  waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
+  waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
+}
+
+  else if (controlCmd == "TX_done") {
+    logSerial("BLE", "Control 'TX' received — transmitting payload via notifications");
+
+    // Send each sample as a binary struct (5 floats) in its own notification.
+    for (int i = 0; i < 12; i++) {
+      // Notify one WaterDataStruct (ensure length matches setMaxLen on char)
+      waterDataChar.notify((uint8_t*)&waterDataPayload[i], sizeof(WaterDataStruct));
+      delay(100); // small gap so central can keep up; adjust if needed
+    }
+
+    // Inform central that TX is done
+    statusCmd = "TX_done";
     waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
     waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
-    devState = TX_LAST;
-    logSerial("BLE", "Sent status 'Listen' (notify)");
+    devState = IDLE;
+    logSerial("BLE", "All payload notified; status set to 'TX_done'");
   }
   else {
     logSerial("BLE", ("Unknown control: " + controlCmd));
