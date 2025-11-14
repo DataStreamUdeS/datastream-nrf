@@ -4,6 +4,6 @@ float readDepthBar30();
 float readPressureBar30();
 void updatePressureSensor();
 void depthManagerInit();
-void depthManagerUpdate(WaterDataStruct* payload);
+bool depthManagerUpdate(WaterDataStruct* payload);
 extern float nextTargetDepth;
 

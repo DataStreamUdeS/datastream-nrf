@@ -4,44 +4,52 @@
 #include "gestionnaireCapteur.h"
 
 MS5837 bar30;
-float lastDepth = 0;
-float lastPressure = 0;
-float nextTargetDepth = 0.5;
-int sampleIndex = 0;
 
-void updatePressureSensor()
-{
-    bar30.read();
-    lastDepth = bar30.depth();
-    lastPressure = bar30.pressure();
-}
+#define PRESSION_ATM_MBAR 1013.0f
+#define THRESOLD_PROFONDEUR 0.05f
 
-float readDepthBar30()     { return lastDepth; }
-float readPressureBar30()  { return lastPressure; }
-
-
-float increment(float d)
-{
-    if (d < 2.0) return 0.5;
-    return 1.0;
-}
+static float nextTargetDepth = 0.5;
+static int sampleIndex = 0;
 
 void depthManagerInit()
 {
-    nextTargetDepth = 0.5;
+    Wire.begin();
+
+    bar30.init();
+    bar30.setModel(MS5837::MS5837_30BA);
+    bar30.setFluidDensity(997); 
+
+    nextTargetDepth = 0.5f;
     sampleIndex = 0;
 }
 
-void depthManagerUpdate(WaterDataStruct* payload)
+float increment(float d)
 {
-    updatePressureSensor();
-    float depth = readDepthBar30();
+    if (d < 2.0f) return 0.5f;
+    return 1.0f;
+}
 
-    if (depth >= nextTargetDepth && sampleIndex < 12)
+bool depthManagerUpdate(WaterDataStruct* payload)
+{
+    bar30.read();
+
+    float profondeur = bar30.depth();
+    float pressure = bar30.pressure();
+
+    // === 1. Arrêt automatique si revenu à l'air ===
+    if (profondeur < THRESOLD_PROFONDEUR && sampleIndex > 0) {
+        return true;  // terminé
+    }
+
+    // === 2. Acquisition selon profondeur ===
+    if (profondeur >= nextTargetDepth && sampleIndex < 12)
     {
         runAllSensors(payload, sampleIndex);
 
-        nextTargetDepth += increment(depth);
+        nextTargetDepth += increment(profondeur);
         sampleIndex++;
     }
+
+    return false; 
 }
+

@@ -4,7 +4,8 @@
 
 #include <Arduino.h>
 #include <bluefruit.h>
-#include "waterDataPayload.h"   // keep your struct / fill function here
+#include "waterDataPayload.h"   
+#include "capteurBaro.h"
 
 // Forward-declare control functions
 void MEASURE_COLLECTION_SENSOR_CONTROL();
@@ -19,7 +20,7 @@ BLECharacteristic waterConfigChar = BLECharacteristic(0x183A);
 BLECharacteristic waterStatusChar = BLECharacteristic(0x184A);
 
 // Keep simple state machine
-enum DeviceState { IDLE, INIT_RECEIVED, READY, MOVING };
+enum DeviceState { IDLE, INIT_RECEIVED, READY, MOVING, DONE};
 DeviceState devState = IDLE;
 
 void logSerial(const char* tag, const String &msg) {
@@ -106,7 +107,7 @@ void MEASURE_COLLECTION_SENSOR_CONTROL() {
   }
   // Log end
   logSerial("SENSOR", "MEASURE_COLLECTION_SENSOR_CONTROL() completed");
-  fillPayloadWithDummyData(waterDataPayload);
+  //fillPayloadWithDummyData(waterDataPayload);
   logSerial("SENSOR", "Dummy data filled into payload");
   
 }
@@ -115,7 +116,7 @@ void beginBLECharacteristics() {
   waterDataService.begin();
   waterDataService.setPermission(SECMODE_OPEN, SECMODE_OPEN);
 
-  fillPayloadWithDummyData(waterDataPayload);
+  //fillPayloadWithDummyData(waterDataPayload);
 
   // Data characteristic (we keep it but not used in handshake)
   waterDataChar.setMaxLen(sizeof(WaterDataStruct));
@@ -202,5 +203,18 @@ void loop() {
   if (millis() - last > 10000) {
     last = millis();
     logSerial("SYS", "Heartbeat - state: " + String(devState));
+  }
+  if (devState == MOVING)
+  {
+    bool finished = depthManagerUpdate(waterDataPayload);
+
+    if (finished)
+    {
+      waterDataChar.notify((uint8_t*)waterDataPayload, sizeof(waterDataPayload));
+
+      waterStatusChar.notify((uint8_t*)"Done", 4);
+
+      devState = DONE;
+    }
   }
 }
