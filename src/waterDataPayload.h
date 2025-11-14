@@ -1,3 +1,5 @@
+#pragma once
+
 struct WaterDataStruct {
   float depth;
   float temperature;
@@ -13,6 +15,6 @@ struct WaterDataStruct {
 //     payload[i].pH = 7.0f + (i * 0.1f);
 //     payload[i].orp = 250.0f + (i * 5.0f);
 //     payload[i].o2 = 8.0f - (i * 0.2f);
-
+    
 //   }
 // }

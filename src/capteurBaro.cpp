@@ -8,8 +8,10 @@ MS5837 bar30;
 #define PRESSION_ATM_MBAR 1013.0f
 #define THRESOLD_PROFONDEUR 0.05f
 
-static float nextTargetDepth = 0.5;
-static int sampleIndex = 0;
+float nextTargetDepth = 0.5f;
+static  int sampleIndex = 0;
+float lastDepth;
+float lastPressure;
 
 void depthManagerInit()
 {
@@ -34,7 +36,7 @@ bool depthManagerUpdate(WaterDataStruct* payload)
     bar30.read();
 
     float profondeur = bar30.depth();
-    float pressure = bar30.pressure();
+    //float pressure = bar30.pressure();
 
     // === 1. Arrêt automatique si revenu à l'air ===
     if (profondeur < THRESOLD_PROFONDEUR && sampleIndex > 0) {
@@ -53,3 +55,12 @@ bool depthManagerUpdate(WaterDataStruct* payload)
     return false; 
 }
 
+float readDepthBar30()
+{
+    return lastDepth;
+}
+
+float readPressureBar30()
+{
+    return lastPressure;
+}

@@ -4,8 +4,8 @@
 
 #include <Arduino.h>
 #include <bluefruit.h>
-#include "waterDataPayload.h"   
 #include "capteurBaro.h"
+#include "waterDataPayload.h"
 
 // Forward-declare control functions
 void MEASURE_COLLECTION_SENSOR_CONTROL();
