@@ -69,6 +69,9 @@ void onControlWritten(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, 
     String statusCmd = "Moving";
     waterStatusChar.write((uint8_t*)statusCmd.c_str(), statusCmd.length());
     waterStatusChar.notify((uint8_t*)statusCmd.c_str(), statusCmd.length());
+
+    depthManagerInit();
+
     logSerial("BLE", "Control 'Moving' received — status set & notified to 'Moving'");
     // At this point the Pi is still connected; the Pi intends to disconnect (simulate going underwater)
   }
