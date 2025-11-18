@@ -6,6 +6,8 @@
 #include <bluefruit.h>
 #include "capteurBaro.h"
 #include "waterDataPayload.h"
+#include "calibration_manager.h"
+
 
 // Forward-declare control functions
 void MEASURE_COLLECTION_SENSOR_CONTROL();
@@ -20,7 +22,7 @@ BLECharacteristic waterConfigChar = BLECharacteristic(0x183A);
 BLECharacteristic waterStatusChar = BLECharacteristic(0x184A);
 
 // Keep simple state machine
-enum DeviceState { IDLE, INIT_RECEIVED, READY, MOVING, DONE};
+enum DeviceState { IDLE, INIT_RECEIVED, READY, MOVING, CALIBRATION, DONE};
 DeviceState devState = IDLE;
 
 void logSerial(const char* tag, const String &msg) {
@@ -70,6 +72,22 @@ void onControlWritten(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, 
     logSerial("BLE", "Control 'Moving' received — status set & notified to 'Moving'");
     // At this point the Pi is still connected; the Pi intends to disconnect (simulate going underwater)
   }
+  else if (cmd.startsWith("Calibrate-")) {
+      devState = CALIBRATION;
+
+      const char* s1 = "Calibrating";
+      waterStatusChar.write((uint8_t*)s1, strlen(s1));
+      waterStatusChar.notify((uint8_t*)s1, strlen(s1));
+
+      startCalibration(cmd);
+
+      const char* s2 = "Calibrated";
+      waterStatusChar.write((uint8_t*)s2, strlen(s2));
+      waterStatusChar.notify((uint8_t*)s2, strlen(s2));
+
+      devState = READY;
+  }
+
   // else if (cmd == "")
   else {
     logSerial("BLE", ("Unknown control: " + cmd));
