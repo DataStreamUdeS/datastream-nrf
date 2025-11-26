@@ -28,11 +28,17 @@ void MEASURE_COLLECTION_SENSOR_CONTROL();
 WaterDataStruct waterDataPayload[12];
 
 // BLE UUIDs - Using full 128-bit UUIDs based on your 16-bit ones
-#define SERVICE_UUID        "0000180A-0000-1000-8000-00805f9b34fb"
-#define DATA_CHAR_UUID      "0000181A-0000-1000-8000-00805f9b34fb"
-#define CONTROL_CHAR_UUID   "0000182A-0000-1000-8000-00805f9b34fb"
-#define CONFIG_CHAR_UUID    "0000183A-0000-1000-8000-00805f9b34fb"
-#define STATUS_CHAR_UUID    "0000184A-0000-1000-8000-00805f9b34fb"
+// #define SERVICE_UUID        "0000180A-0000-1000-8000-00805f9b34fb"
+// #define DATA_CHAR_UUID      "0000181A-0000-1000-8000-00805f9b34fb"
+// #define CONTROL_CHAR_UUID   "0000182A-0000-1000-8000-00805f9b34fb"
+// #define CONFIG_CHAR_UUID    "0000183A-0000-1000-8000-00805f9b34fb"
+// #define STATUS_CHAR_UUID    "0000184A-0000-1000-8000-00805f9b34fb"
+
+#define SERVICE_UUID        "180A"
+#define DATA_CHAR_UUID      "181A"
+#define CONTROL_CHAR_UUID   "182A"
+#define CONFIG_CHAR_UUID    "183A"
+#define STATUS_CHAR_UUID    "184A"
 
 // BLE Objects
 BLEServer* pServer = nullptr;
@@ -43,7 +49,7 @@ BLECharacteristic* waterConfigChar = nullptr;
 BLECharacteristic* waterStatusChar = nullptr;
 
 // State machine
-enum DeviceState { IDLE, INIT_RECEIVED, READY, MOVING };
+enum DeviceState { IDLE, INIT_RECEIVED, READY, MOVING, TX_READY, TX};
 DeviceState devState = IDLE;
 
 // Connection status
@@ -73,12 +79,12 @@ class MyServerCallbacks: public BLEServerCallbacks {
       logSerial("BLE", "Central disconnected - calling MEASURE_COLLECTION_SENSOR_CONTROL()");
       
       // Start sensor collection because RPi is underwater / gone
-      MEASURE_COLLECTION_SENSOR_CONTROL();
+      
       
       // Restart advertising after disconnect
-      delay(500); // Small delay before restarting advertising
-      BLEDevice::startAdvertising();
-      logSerial("BLE", "Advertising restarted");
+      // delay(500); // Small delay before restarting advertising
+      // BLEDevice::startAdvertising();
+      // logSerial("BLE", "Advertising restarted");
     }
 };
 
@@ -101,14 +107,44 @@ class ControlCharCallbacks: public BLECharacteristicCallbacks {
           devState = READY;
           logSerial("BLE", "Sent status 'Ready' (notify)");
         }
-        else if (cmd == "Moving") {
+        else if ((cmd == "start_retriving") && (devState == READY)) {
           devState = MOVING;
           // Update and notify status as well
           String statusCmd = "Moving";
           waterStatusChar->setValue(statusCmd.c_str());
           waterStatusChar->notify();
           logSerial("BLE", "Control 'Moving' received - status set & notified to 'Moving'");
+          // TODO ÉMILE : code des capteurs
+          MEASURE_COLLECTION_SENSOR_CONTROL();
+          devState = TX_READY;
+          // Notify status "Ready_to_tx"
+          statusCmd = "ready_to_tx";
+          waterStatusChar->setValue(statusCmd.c_str());
+          waterStatusChar->notify();
+          logSerial("BLE", "Sensor measurements done - sent status 'ready_to_tx' (notify)");
           // At this point the Pi is still connected; the Pi intends to disconnect
+        }
+        else if ((cmd == "ready_to_tx") && (devState == TX_READY)) {
+          devState = TX;
+          // Notify status "Idle"
+          String statusCmd = "tx";
+          waterStatusChar->setValue(statusCmd.c_str());
+          waterStatusChar->notify();
+          waterDataChar->setValue((uint8_t*)waterDataPayload, sizeof(WaterDataStruct) * 12);
+          waterDataChar->notify();
+          logSerial("BLE", "Sent status 'tx' and notified data");
+        }
+        else if (cmd == "done_tx") {
+          devState = IDLE;
+          // Notify status "Idle"
+          String statusCmd = "Idle";
+          waterStatusChar->setValue(statusCmd.c_str());
+          waterStatusChar->notify();
+          logSerial("BLE", "Sent status 'Idle' (notify)");
+        }
+        else if (cmd.startsWith("Calibration")) { //might fuck up, pas sur que la fonction est reconnu
+          logSerial("BLE", "Calibration command received - not implemented yet");
+          // TODO : Implement calibration handling
         }
         else {
           logSerial("BLE", ("Unknown control: " + cmd));
