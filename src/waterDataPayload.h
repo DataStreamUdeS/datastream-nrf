@@ -1,9 +1,13 @@
+#ifndef WATER_DATA_PAYLOAD_H
+#define WATER_DATA_PAYLOAD_H
+
 struct WaterDataStruct {
   float depth;
   float temperature;
   float pH;
   float orp;
-  float o2;};
+  float o2;
+};
 
 void fillPayloadWithDummyData(WaterDataStruct* payload) {
   for (int i = 0; i < 12; i++) {
@@ -14,3 +18,5 @@ void fillPayloadWithDummyData(WaterDataStruct* payload) {
     payload[i].o2 = 8.0f - (i * 0.2f);
   }
 }
+
+#endif
