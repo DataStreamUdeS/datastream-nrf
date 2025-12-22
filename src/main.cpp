@@ -209,6 +209,8 @@ void initBLE() {
                       BLECharacteristic::PROPERTY_READ |
                       BLECharacteristic::PROPERTY_NOTIFY
                     );
+  
+waterDataChar->setAccessPermissions(ESP_GATT_PERM_READ);
   waterDataChar->addDescriptor(new BLE2902());
   
   // Initialize with dummy data
@@ -221,6 +223,8 @@ void initBLE() {
                       BLECharacteristic::PROPERTY_WRITE |
                       BLECharacteristic::PROPERTY_WRITE_NR
                     );
+  
+  waterDataChar->setAccessPermissions(ESP_GATT_PERM_WRITE);
   waterControlChar->setCallbacks(new ControlCharCallbacks());
   waterControlChar->setValue("Idle");
   
@@ -230,15 +234,17 @@ void initBLE() {
                       BLECharacteristic::PROPERTY_READ |
                       BLECharacteristic::PROPERTY_WRITE
                     );
+  waterConfigChar->setAccessPermissions(
+    ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE
+  );
   waterConfigChar->setValue("Default");
   
   // Create Status Characteristic (Read, Write, Notify)
   waterStatusChar = pService->createCharacteristic(
                       STATUS_CHAR_UUID,
-                      BLECharacteristic::PROPERTY_READ |
-                      BLECharacteristic::PROPERTY_WRITE |
-                      BLECharacteristic::PROPERTY_NOTIFY
+                      BLECharacteristic::PROPERTY_READ
                     );
+  waterStatusChar->setAccessPermissions(ESP_GATT_PERM_READ);                
   waterStatusChar->addDescriptor(new BLE2902());
   waterStatusChar->setCallbacks(new StatusCharCallbacks());
   waterStatusChar->setValue("Sleeping");
