@@ -116,8 +116,14 @@ class ControlCharCallbacks: public BLECharacteristicCallbacks {
           String statusCmd = "tx";
           waterStatusChar->setValue(statusCmd.c_str());
           waterStatusChar->notify();
-          waterDataChar->setValue((uint8_t*)waterDataPayload, sizeof(WaterDataStruct) * 12);
-          waterDataChar->notify();
+
+          for (int i = 0; i < 12; i++) {
+            waterDataChar->setValue((uint8_t*)&waterDataPayload[i], sizeof(waterDataPayload[i]));
+            waterDataChar->notify();
+            delay(50);
+          }
+          // waterDataChar->setValue((uint8_t*)waterDataPayload, sizeof(WaterDataStruct) * 12);
+          // waterDataChar->notify();
           logSerial("BLE", "Sent status 'tx' and notified data");
         }
         else if (cmd == "done_tx") {
@@ -181,7 +187,7 @@ void MEASURE_COLLECTION_SENSOR_CONTROL() {
               " O2: " + String(waterDataPayload[i].o2));
     
     // Delay between measurements
-    if (i < 11) delay(2000); // 5 seconds between readings
+    if (i < 11) delay(200); // 5 seconds between readings
   }
   
   logSerial("SENSOR", "MEASURE_COLLECTION_SENSOR_CONTROL() completed");
